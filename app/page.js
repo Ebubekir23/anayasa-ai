@@ -68,11 +68,14 @@ const renderTextWithCitations = (text, theme) => {
     if (keyStr === "madde") keyStr = "anayasa"; 
     
     const lawData = LAW_DB[keyStr] || LAW_DB.anayasa;
-    const article = match[2];
+const article = match[2];
+const href = keyStr === "madde" || keyStr === "anayasa"
+  ? `https://www.mevzuat.gov.tr/anayasa/madde/${article}`
+  : lawData.url;
 
-    parts.push(
-      <a 
-        key={match.index} href={lawData.url} target="_blank" rel="noopener noreferrer"
+parts.push(
+  <a 
+    key={match.index} href={href} target="_blank"
         className="inline-flex items-center px-2 py-0.5 mx-1 rounded text-xs font-semibold no-underline shadow-sm transition-opacity hover:opacity-80"
         style={{ 
           backgroundColor: theme === 'dark' ? '#262C3D' : '#F5EDD9',
@@ -122,6 +125,20 @@ const Bubble = ({ msg, theme, onRetry }) => {
            {isUser || msg.isError ? msg.content : renderTextWithCitations(msg.content, theme)}
         </div>
       </div>
+    {!isUser && !msg.isError && msg.sources && msg.sources.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {msg.sources.map((src, i) => (
+            <a key={i}
+              href={`https://www.mevzuat.gov.tr/anayasa/madde/${src.id}`}
+              target="_blank" rel="noopener noreferrer"
+              className="px-2 py-1 rounded text-xs no-underline"
+              style={{ backgroundColor: '#F5EDD9', color: '#8B2635', border: '1px solid #E5DAB8' }}
+            >
+              Madde {src.id}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -171,7 +188,11 @@ export default function App() {
         setMessages(prev => [...prev, { role: "assistant", content: data.error || t.errorGeneric, isError: true }]);
       } else {
         // Başarı durumunda rol "assistant"
-        setMessages(prev => [...prev, { role: "assistant", content: data.text }]);
+        setMessages(prev => [...prev, {
+          role: "assistant",
+          content: data.text,
+          sources: data.sources || [],
+        }]);
       }
     } catch (err) {
       setMessages(prev => [...prev, { role: "assistant", content: t.errorGeneric, isError: true }]);
