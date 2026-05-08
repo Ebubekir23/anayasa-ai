@@ -227,7 +227,7 @@ export async function POST(req) {
         id: a.id,
         title: a.title,
         preview: a.content.slice(0, 120) + "...",
-        url: `https://github.com/AybarsBarut/Turkiye-Cumhuriyeti-Anayasasi-Repo/blob/main/data/constitution.json`,
+        url: `https://www.mevzuat.gov.tr/mevzuatmetin/1.5.2709.pdf`,
       })),
       wasTruncated: response.stop_reason === "max_tokens",
       usage: {

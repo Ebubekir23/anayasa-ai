@@ -69,9 +69,7 @@ const renderTextWithCitations = (text, theme) => {
     
     const lawData = LAW_DB[keyStr] || LAW_DB.anayasa;
 const article = match[2];
-const href = keyStr === "madde" || keyStr === "anayasa"
-  ? `https://www.mevzuat.gov.tr/anayasa/madde/${article}`
-  : lawData.url;
+const href = lawData.url;
 
 parts.push(
   <a 
@@ -129,7 +127,7 @@ const Bubble = ({ msg, theme, onRetry }) => {
         <div className="flex flex-wrap gap-2 mt-2">
           {msg.sources.map((src, i) => (
             <a key={i}
-              href={`https://www.mevzuat.gov.tr/anayasa/madde/${src.id}`}
+              href={`https://www.mevzuat.gov.tr/mevzuatmetin/1.5.2709.pdf`}
               target="_blank" rel="noopener noreferrer"
               className="px-2 py-1 rounded text-xs no-underline"
               style={{ backgroundColor: '#F5EDD9', color: '#8B2635', border: '1px solid #E5DAB8' }}
