@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# ⚖️ HUKUK·AI — Türk Hukuku Yapay Zeka Asistanı
 
-## Getting Started
+**GİTEK Yapay Zeka Etkinliği** kapsamında geliştirilen, RAG (Retrieval-Augmented Generation) mimarisi tabanlı yapay zeka destekli hukuk asistanı.
 
-First, run the development server:
+## 🎯 Proje Amacı
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Türk vatandaşlarının hukuki bilgiye kolay, hızlı ve güvenilir şekilde erişimini sağlamak. Sistem, kullanıcı sorularını **Anayasa ve 11 temel Türk kanunu** veritabanında arayarak gerçek kanun maddelerine dayalı yanıtlar üretir.
+
+## 🏗️ Mimari
+
+```
+Kullanıcı Sorusu
+       │
+       ▼
+┌──────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│  1. VERİ     │     │  2. RETRIEVAL    │     │  3. GENERATION   │
+│  KATMANI     │────▶│  KATMANI         │────▶│  KATMANI         │
+│              │     │                  │     │                  │
+│ 12 kaynak    │     │ TF-ağırlıklı     │     │ Claude Sonnet    │
+│ 6.033 madde  │     │ keyword arama    │     │ 4.5 API          │
+│ JSON format  │     │ Top-5 madde      │     │ Kaynaklı cevap   │
+└──────────────┘     └──────────────────┘     └──────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📚 Veritabanı Kapsamı
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+| Kaynak | Kısaltma | Kanun No |
+|--------|----------|----------|
+| Türkiye Cumhuriyeti Anayasası | Anayasa | 2709 |
+| Türk Ceza Kanunu | TCK | 5237 |
+| Türk Medeni Kanunu | TMK | 4721 |
+| Türk Borçlar Kanunu | TBK | 6098 |
+| Hukuk Muhakemeleri Kanunu | HMK | 6100 |
+| Ceza Muhakemesi Kanunu | CMK | 5271 |
+| İş Kanunu | İK | 4857 |
+| Kişisel Verilerin Korunması Kanunu | KVKK | 6698 |
+| Türk Ticaret Kanunu | TTK | 6102 |
+| İcra ve İflas Kanunu | İİK | 2004 |
+| Vergi Usul Kanunu | VUK | 213 |
+| Karayolları Trafik Kanunu | KTK | 2918 |
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## ✨ Özellikler
 
-## Learn More
+- **📖 Soru-Cevap Modu**: Hukuki sorulara kanun maddelerine dayalı yanıtlar
+- **📝 Dilekçe Modu**: Hukuki senaryoya göre resmi dilekçe taslağı oluşturma
+- **🔗 Tıklanabilir Kaynak Atıfları**: Her yanıttaki `[TCK Madde 86]` gibi atıflar mevzuat.gov.tr PDF'lerine bağlantı içerir
+- **🌐 İki Dilli Destek**: Türkçe ve İngilizce arayüz + yanıtlar
+- **🛡️ Halüsinasyon Koruması**: Model yalnızca veritabanındaki maddelere dayanır
+- **🌗 Karanlık/Aydınlık Tema**: Kullanıcı tercihine göre tema değişimi
+- **⚡ Rate Limiting**: Aşırı kullanıma karşı koruma
 
-To learn more about Next.js, take a look at the following resources:
+## 🛠️ Teknoloji Yığını
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Teknoloji | Sürüm | Amaç |
+|-----------|-------|------|
+| Next.js | 14.2.35 | Full-stack web framework |
+| React | 18.x | UI bileşenleri |
+| Anthropic Claude SDK | 0.91.1 | LLM API entegrasyonu (Claude Sonnet 4.5) |
+| Tailwind CSS | 3.4.1 | Styling |
+| Lucide React | 1.14.0 | İkon seti |
+| PyMuPDF (fitz) | — | PDF'den metin çıkarma (veri toplama) |
+| Python | 3.12 | Veri toplama scriptleri |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+## 🚀 Kurulum ve Çalıştırma
 
-## Deploy on Vercel
+```bash
+# 1. Repoyu klonlayın
+git clone https://github.com/Ebubekir23/anayasa-ai.git
+cd anayasa-ai
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# 2. Bağımlılıkları yükleyin
+npm install
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+# 3. Ortam değişkenlerini ayarlayın
+# .env dosyası oluşturun:
+echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
+
+# 4. Geliştirme sunucusunu başlatın
+npm run dev
+```
+
+Tarayıcınızda [http://localhost:3000](http://localhost:3000) adresini açın.
+
+## 📁 Proje Yapısı
+
+```
+anayasa-ai/
+├── app/
+│   ├── api/chat/route.js   # RAG API endpoint (arama + Claude entegrasyonu)
+│   ├── page.js             # Ana chatbot arayüzü
+│   ├── layout.js           # Next.js layout
+│   └── globals.css         # Global stiller
+├── data/
+│   ├── constitution.json   # Anayasa maddeleri
+│   ├── tck.json           # Türk Ceza Kanunu maddeleri
+│   ├── tmk.json           # Türk Medeni Kanunu maddeleri
+│   └── ...                # Diğer kanun JSON dosyaları
+├── lib/
+│   ├── prompts.js         # Sistem prompt'ları (TR/EN × QA/Dilekçe)
+│   ├── sanitize.js        # Halüsinasyon filtresi
+│   └── rate-limit.js      # Rate limiting modülü
+└── package.json
+```
+
+## 📄 Lisans
+
+Bu proje GİTEK Yapay Zeka Etkinliği kapsamında eğitim amaçlı geliştirilmiştir.
+
+---
+
+> ⚠️ **Sorumluluk Reddi**: Bu sistem yapay zeka destekli bilgilendirme aracıdır. Gerçek hukuki süreçler için mutlaka bir avukata danışınız.

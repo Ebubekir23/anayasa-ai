@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { SYSTEM_PROMPTS } from "@/lib/prompts";
+import { sanitizeHallucinatedToolCalls } from "@/lib/sanitize";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -189,7 +192,7 @@ function searchArticles(query, topK = 5) {
 }
 
 // =========================================================
-// SİSTEM PROMPT
+// SİSTEM PROMPT — lib/prompts.js'den gelen gelişmiş prompt + RAG bağlamı
 // =========================================================
 function buildSystemPrompt(mode, lang, articles) {
   const dbText = articles.length
@@ -200,37 +203,11 @@ function buildSystemPrompt(mode, lang, articles) {
 
   const context = `MEVZUAT VERİTABANI:\n${"=".repeat(50)}\n${dbText}\n${"=".repeat(50)}`;
 
-  const rules = lang === "tr" ? `
-KURALLAR:
-1. Sadece yukarıdaki veritabanı maddelerine dayan.
-2. Atıf formatı: [TCK Madde 86], [Anayasa Madde 10], [TMK Madde 4]
-3. Net ve hukuki dil kullan.
-4. Son satır: "Bu yapay zeka destekli bilgilendirmedir; gerçek hukuki süreçler için avukata danışınız."
+  // lib/prompts.js'den gelen gelişmiş prompt'ları kullan
+  const promptKey = mode === "petition" ? `petition_${lang}` : `qa_${lang}`;
+  const basePrompt = SYSTEM_PROMPTS[promptKey] || SYSTEM_PROMPTS.qa_tr;
 
-ÖZEL DURUMLAR:
-5. "Nasılsın", "selam", "iyi misin" gibi günlük sorulara: Sıcak ve kısa cevap ver (örn: "İyiyim, teşekkürler! Size hukuki konularda nasıl yardımcı olabilirim?"). Asla sert reddetme.
-6. Bir isim veya konu sorulduğunda (örn: "Emir Tanık kimdir"): Önce "Bu isimde bir bilgi veritabanımda yok" deme. Sorudaki hukuki kavramları yakala ve onları açıkla. "Emir Tanık" → "tanık" kavramını açıkla. "Ali Borç" → "borç" kavramını açıkla.
-7. Tamamen alakasız sorularda (pizza tarifi, futbol vb.): Kısa ve esprili bir cevap ver, sonra hukuki konuya davet et. "Bu konuda uzman değilim ama hukuki sorularınızda yardımcı olabilirim!"
-8. Veritabanında ilgili madde yoksa: Kesinlikle "veritabanımda yok" ifadesini kullanma. Bunun yerine genel hukuki bilginle kısa bir cevap ver ve "Bu konuda daha fazla bilgi için avukata danışmanızı öneririm." de.
-` : `
-RULES:
-1. Use ONLY the database articles above for legal questions.
-2. Citations: [TCK Madde 86], [Anayasa Madde 10], [TMK Madde 4]
-3. Clear legal English.
-4. End legal answers with: "This is AI-generated information; consult a licensed attorney."
-
-SPECIAL CASES:
-5. Casual greetings ("how are you", "hello"): Respond warmly and briefly, invite to ask legal questions. Never reject rudely.
-6. Names or ambiguous queries: Extract the legal concept and explain it. "John Witness" → explain "witness". Never say "not in database".
-7. Completely off-topic (recipes, sports): Short witty response, invite to legal topics.
-8. If no database article found: Don't say "not in database". Give a brief general legal answer and suggest consulting an attorney.
-`;
-
-  if (mode === "petition") {
-    return `${context}\n\n${lang === "tr" ? `Sen Türk hukukuna uygun resmi dilekçe hazırlayan bir uzmansın.\n${rules}\nFORMAT:\n⚠️ Taslak uyarısı → Mahkeme başlığı → DAVACI/DAVALI/KONU/AÇIKLAMALAR/HUKUKİ NEDENLER/DELİLLER/SONUÇ → Tarih/İmza` : `You prepare formal Turkish-law petitions.\n${rules}\nFORMAT:\n⚠️ Draft warning → Court heading → PLAINTIFF/DEFENDANT/SUBJECT/FACTS/LEGAL GROUNDS/EVIDENCE/CONCLUSION → Date/Signature`}`;
-  }
-
-  return `${context}\n\n${lang === "tr" ? `Sen Türk hukuku uzmanı bir asistansın. ANAYASA-AI projesinin parçasısın.\n${rules}\nCEVAPLARIN TÜRKÇE OLSUN.` : `You are a Turkish law assistant. Part of ANAYASA-AI.\n${rules}\nALWAYS RESPOND IN ENGLISH.`}`;
+  return `${context}\n\n${basePrompt}`;
 }
 
 // =========================================================
@@ -242,6 +219,16 @@ const MODEL = "claude-sonnet-4-5";
 
 export async function POST(req) {
   try {
+    // Rate limiting kontrolü
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rateCheck = checkRateLimit(ip);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "rate_limit", message: `Çok fazla istek. ${rateCheck.resetIn} saniye sonra tekrar deneyin.` },
+        { status: 429, headers: { "Retry-After": String(rateCheck.resetIn) } }
+      );
+    }
+
     const { messages, mode, lang } = (await req.json()) || {};
 
     if (!Array.isArray(messages) || !messages.length) {
@@ -266,10 +253,16 @@ export async function POST(req) {
       messages: history,
     });
 
-    const text = response.content
+    const rawText = response.content
       .filter((b) => b.type === "text")
       .map((b) => b.text)
       .join("\n\n");
+
+    // Halüsinasyon filtresi — sahte tool çağrılarını temizle
+    const { cleaned: text, hadFakeCall } = sanitizeHallucinatedToolCalls(rawText);
+    if (hadFakeCall) {
+      console.warn(`[SANITIZE] Sahte tool çağrısı tespit edildi ve temizlendi (IP: ${ip})`);
+    }
 
     return NextResponse.json({
       text: text || "(Boş cevap)",
